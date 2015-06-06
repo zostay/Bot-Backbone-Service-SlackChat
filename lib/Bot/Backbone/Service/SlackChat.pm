@@ -548,4 +548,13 @@ sub send_message {
         });
 }
 
+=begin Pod::Coverage
+
+    load_channel
+    mark_read
+
+=end Pod::Coverage
+
+=cut
+
 __PACKAGE__->meta->make_immutable;
