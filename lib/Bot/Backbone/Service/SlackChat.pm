@@ -441,7 +441,7 @@ sub got_direct_message {
             text  => $slack_msg->{text},
         });
 
-    $self->resent_message($message);
+    $self->resend_message($message);
     $self->dispatch_message($message);
 }
 
