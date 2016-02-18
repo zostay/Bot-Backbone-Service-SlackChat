@@ -1,0 +1,4 @@
+{{$NEXT}}
+
+    * Changed send_message to use Slack REST API rather than Slack RTM because
+      the API allows for message formatting, while RTM does not.
