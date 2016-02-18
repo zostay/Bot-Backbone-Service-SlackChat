@@ -13,6 +13,7 @@ with qw(
 use Bot::Backbone::Message;
 use Carp;
 use CHI;
+use Encode;
 use AnyEvent::SlackRTM;
 use WebService::Slack::WebApi;
 
@@ -549,7 +550,7 @@ sub send_message {
 
     $self->api->chat->post_message(
         channel => $channel,
-        text    => $text,
+        text    => encode('utf8', $text),
         as_user => 1,
     );
 }

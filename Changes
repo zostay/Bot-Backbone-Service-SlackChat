@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    * Fixed encoding issues when sending wide characters to Slack.
+
 0.160490  2016-02-18 10:28:56-06:00 America/Chicago
 
     * Changed send_message to use Slack REST API rather than Slack RTM because
