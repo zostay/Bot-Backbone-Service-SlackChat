@@ -94,7 +94,7 @@ has cache => (
 );
 
 sub _build_cache {
-    CHI->new( 
+    CHI->new(
         driver     => 'Memory',
         datastore  => {},
         expires_in => 60, # let's not bother to cache for long
@@ -345,8 +345,8 @@ sub load_channel {
         }
     }
     elsif ($type eq 'C') {
-        my $res = $self->_cached("api.channels.info:channel=$value", sub { 
-                $self->api->channels->info( channel => $value ) 
+        my $res = $self->_cached("api.channels.info:channel=$value", sub {
+                $self->api->channels->info( channel => $value )
             });
         $group = $res->{channel} if $res->{ok};
     }
@@ -390,7 +390,7 @@ sub join_group {
 
 Handles messages from Slack. Decides whether they are group messages or direct and forwards them on as appropriate. Messages with a "subtype" will be ignored as will messages that are "edited".
 
-This method also marks messages as read. 
+This method also marks messages as read.
 
 =cut
 
@@ -433,6 +433,9 @@ Handles direct messages received from an IM channel.
 sub got_direct_message {
     my ($self, $slack_msg) = @_;
 
+    # Ignore messages from ourself
+    return if $slack_msg->{user} eq $self->whoami->{user_id};
+
     my $message = Bot::Backbone::Message->new({
             chat  => $self,
             from  => $self->load_user(id => $slack_msg->{user}),
@@ -457,7 +460,7 @@ sub is_to_me {
     my $me_nick = $me_user->nickname;
     return scalar($$text =~ s/^ @?$me_nick \s* [:,\-] \s*
         |  \s* , \s* @?$me_nick [.!?]? $
-        |  , \s* @?$me_nick \s* , 
+        |  , \s* @?$me_nick \s* ,
         //x);
 }
 
@@ -493,6 +496,9 @@ This handles message received from private group or team channels.
 
 sub got_group_message {
     my ($self, $slack_msg) = @_;
+
+    # Ignore messages from ourself
+    return if $slack_msg->{user} eq $self->whoami->{user_id};
 
     my $me_user = $self->load_me;
 
@@ -541,11 +547,11 @@ sub send_message {
         $channel = $self->load_user_channel( user => $to );
     }
 
-    $self->rtm->send({
-            type    => 'message',
-            channel => $channel,
-            text    => $text,
-        });
+    $self->api->chat->post_message(
+        channel => $channel,
+        text    => $text,
+        as_user => 1,
+    );
 }
 
 =begin Pod::Coverage
