@@ -1,5 +1,6 @@
 {{$NEXT}}
 
+    * Added formatted Message Attachments.
     * Fixed encoding issues when sending wide characters to Slack.
 
 0.160490  2016-02-18 10:28:56-06:00 America/Chicago

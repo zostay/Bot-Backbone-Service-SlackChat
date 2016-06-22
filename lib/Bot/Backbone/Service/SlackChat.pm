@@ -524,21 +524,25 @@ sub got_group_message {
 =head2 send_message
 
     method send_message({
-        to    => $user_id,
-        group => $group_id,
-        text  => $message,
+        to          => $user_id,
+        group       => $group_id,
+        text        => $message,
+        attachments => $attachments,
     })
 
-This sends a message to a Slack channel. To the named user's IM channel or to a private group or team channel named by C<$group_id>.
+This sends a message to a Slack channel. To the named user's IM channel or to a private group or team channel named by C<$group_id>.  Attachments can be included to produce formatted messages.
+
+L<Slack Message Attachment API|https://api.slack.com/docs/attachments>
 
 =cut
 
 sub send_message {
     my ($self, $params) = @_;
 
-    my $to    = $params->{to};
-    my $group = $params->{group};
-    my $text  = $params->{text};
+    my $to          = $params->{to};
+    my $group       = $params->{group};
+    my $text        = $params->{text};
+    my $attachments = $params->{attachments};
 
     my $channel;
     if (defined $group) {
@@ -548,11 +552,18 @@ sub send_message {
         $channel = $self->load_user_channel( user => $to );
     }
 
-    $self->api->chat->post_message(
+    my %message_opts = (
         channel => $channel,
-        text    => encode('utf8', $text),
         as_user => 1,
     );
+    if (defined $text) {
+        $message_opts{text} = encode('utf8', $text);
+    }
+    if (defined $attachments) {
+        $message_opts{attachments} = $attachments;
+    }
+
+    $self->api->chat->post_message(%message_opts);
 }
 
 =begin Pod::Coverage
