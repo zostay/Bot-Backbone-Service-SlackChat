@@ -90,15 +90,17 @@ For example:
         service           => 'SlackChat',
         token             => '...', # see slack.com for your tokens
         on_channel_joined => sub {
-            my ($slack, $channel_name, $during_init) = @_;
-            service "group_$channel_name" => (
+            my ($slack, $channel, $name, $during_init) = @_;
+            service "group_$name" => (
                 service    => 'GroupChat',
+                chat       => 'slack_chat',
+                group      => $channel,
                 dispatcher => 'general',
             );
         },
     );
 
-The called subroutine will be passed this object (from which you can make API calls via C<< $slack->api >>), the name of the newly joined channel, and the "during init" flag. The boolean flag sent as the third argument is set to true if the callback is being called while the SlackChat service is being initialized. If the flag is false, this indicates that it is happening in reaction to the bot receiving a "channel_joined" message while running.
+The called subroutine will be passed this object (from which you can make API calls via C<< $slack->api >>), the Slack ID of the newly joined channel, the human name of the newly joined channel, and the "during init" flag. The boolean flag sent as the third argument is set to true if the callback is being called while the SlackChat service is being initialized. If the flag is false, this indicates that it is happening in reaction to the bot receiving a "channel_joined" message while running.
 
 =cut
 
@@ -274,7 +276,7 @@ sub _when_channel_joined {
 
             next if $self->_seen_channels->{ $id };
 
-            $self->on_channel_joined->($self, $channel->{name}, $init);
+            $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, $init);
             $self->_seen_channels->{ $id }++;
         }
 
