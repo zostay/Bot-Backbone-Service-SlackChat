@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+    * Added the on_channel_joined helper to make it easy to react when a bot is
+      invited to channels.
+
 0.161740  2016-06-22 19:57:20-04:00 America/New_York
 
     * Added formatted Message Attachments (HT: @spazm)

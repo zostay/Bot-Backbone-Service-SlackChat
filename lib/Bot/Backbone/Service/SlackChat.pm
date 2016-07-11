@@ -80,6 +80,41 @@ has token => (
     required    => 1,
 );
 
+=head2 on_channel_joined
+
+This may be set to a subroutine to call whenever the bot is invited to join a channel. This allows the bot to be configured to handle channels as it is invited to them.
+
+For example:
+
+    service slack_chat => (
+        service           => 'SlackChat',
+        token             => '...', # see slack.com for your tokens
+        on_channel_joined => sub {
+            my ($slack, $channel_name, $during_init) = @_;
+            service "group_$channel_name" => (
+                service    => 'GroupChat',
+                dispatcher => 'general',
+            );
+        },
+    );
+
+The called subroutine will be passed this object (from which you can make API calls via C<< $slack->api >>), the name of the newly joined channel, and the "during init" flag. The boolean flag sent as the third argument is set to true if the callback is being called while the SlackChat service is being initialized. If the flag is false, this indicates that it is happening in reaction to the bot receiving a "channel_joined" message while running.
+
+=cut
+
+has on_channel_joined => (
+    is           => 'ro',
+    isa          => 'CodeRef',
+    predicate    => 'has_channel_joined_callback',
+);
+
+has _seen_channels => (
+    is          => 'ro',
+    isa         => 'HashRef',
+    required    => 1,
+    default     => sub { [] },
+);
+
 =head2 cache
 
 This is a L<CHI> cache to use to temporarily store response from the Slack APIs. By default, this is a memory-only cache that caches data for only 60 seconds. The purpose is mainly to prevent repeated requests to the API, which might result in rate limiting.
@@ -227,12 +262,35 @@ This connects to Slack and prepares the bot for communication.
 
 =cut
 
+sub _when_channel_joined {
+    my ($self, $init) = @_;
+
+    next unless $self->has_channel_joined_callback;
+
+    my $channels = $self->api->channels->list;
+    if ($channels->{ok}) {
+        for my $channel (@{ $channels->{channels} }) {
+            my $id = $channel->{id};
+
+            next if $self->_seen_channels->{ $id };
+
+            $self->on_channel_joined->($self, $channel->{name}, $init);
+            $self->_seen_channels->{ $id }++;
+        }
+
+        $self->bot->construct_services;
+    }
+}
+
 sub initialize {
     my $self = shift;
 
+    $self->_when_channel_joined(1);
+
     $self->rtm->on(
-        message => sub { $self->got_message(@_) },
-        error   => sub { $self->error_callback->($self, @_) }
+        message        => sub { $self->got_message(@_) },
+        error          => sub { $self->error_callback->($self, @_) }
+        channel_joined => sub { $self->_when_channel_joined('') }
     );
 
     $self->rtm->quiet(1);
