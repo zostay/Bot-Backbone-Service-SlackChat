@@ -114,7 +114,7 @@ has _seen_channels => (
     is          => 'ro',
     isa         => 'HashRef',
     required    => 1,
-    default     => sub { [] },
+    default     => sub { {} },
 );
 
 =head2 cache
@@ -269,19 +269,29 @@ sub _when_channel_joined {
 
     next unless $self->has_channel_joined_callback;
 
+    my @mine;
+
     my $channels = $self->api->channels->list;
     if ($channels->{ok}) {
-        for my $channel (@{ $channels->{channels} }) {
-            my $id = $channel->{id};
-
-            next if $self->_seen_channels->{ $id };
-
-            $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, $init);
-            $self->_seen_channels->{ $id }++;
-        }
-
-        $self->bot->construct_services;
+        push @mine, grep { $_->{is_member} && !$_->{is_archived} } @{ $channels->{channels} };
     }
+
+    my $groups   = $self->api->groups->list;
+    if ($groups->{ok}) {
+        push @mine, grep { !$_->{is_archived} } @{ $groups->{groups} };
+    }
+
+    for my $channel (@mine) {
+        my $id = $channel->{id};
+
+        next if $self->_seen_channels->{ $id };
+
+        $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, $init);
+        $self->_seen_channels->{ $id }++;
+    }
+
+    $self->bot->construct_services;
+    $self->bot->initialize_services;
 }
 
 sub initialize {
@@ -291,8 +301,9 @@ sub initialize {
 
     $self->rtm->on(
         message        => sub { $self->got_message(@_) },
-        error          => sub { $self->error_callback->($self, @_) }
-        channel_joined => sub { $self->_when_channel_joined('') }
+        error          => sub { $self->error_callback->($self, @_) },
+        channel_joined => sub { $self->_when_channel_joined('') },
+        group_joined   => sub { $self->_when_channel_joined('') },
     );
 
     $self->rtm->quiet(1);
