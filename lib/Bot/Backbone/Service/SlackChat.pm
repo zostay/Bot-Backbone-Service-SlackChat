@@ -265,7 +265,23 @@ This connects to Slack and prepares the bot for communication.
 =cut
 
 sub _when_channel_joined {
-    my ($self, $init) = @_;
+    my ($self, $channel) = @_;
+
+    return unless $self->has_channel_joined_callback;
+
+    my $id = $channel->{id};
+
+    next if $self->_seen_channels->{ $id };
+
+    $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, '');
+    $self->_seen_channels->{ $id }++;
+
+    $self->bot->construct_services;
+    $self->bot->initialize_services;
+}
+
+sub _check_channels_joined {
+    my ($self) = @_;
 
     return unless $self->has_channel_joined_callback;
 
@@ -292,7 +308,7 @@ sub _when_channel_joined {
 
         next if $self->_seen_channels->{ $id };
 
-        $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, $init);
+        $self->on_channel_joined->($self, $channel->{id}, $channel->{name}, 1);
         $self->_seen_channels->{ $id }++;
     }
 
@@ -303,13 +319,13 @@ sub _when_channel_joined {
 sub initialize {
     my $self = shift;
 
-    $self->_when_channel_joined(1);
+    $self->_check_channels_joined;
 
     $self->rtm->on(
         message        => sub { $self->got_message(@_) },
         error          => sub { $self->error_callback->($self, @_) },
-        channel_joined => sub { $self->_when_channel_joined('') },
-        group_joined   => sub { $self->_when_channel_joined('') },
+        channel_joined => sub { $self->_when_channel_joined($_[1]{channel}) },
+        group_joined   => sub { $self->_when_channel_joined($_[1]{channel}) },
     );
 
     $self->rtm->quiet(1);

@@ -18,6 +18,11 @@ has done => (
     required   => 1,
 );
 
+has invited => (
+    is         => 'ro',
+    predicate  => 'has_invited',
+);
+
 has channel => (
     is         => 'ro',
     isa        => 'Str',
@@ -80,6 +85,7 @@ override run => sub {
 
             #warn "# READY\n";
             $self->ready->send;
+            $self->invited->send if $self->has_invited;
         },
     );
 

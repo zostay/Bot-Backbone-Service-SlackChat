@@ -31,6 +31,10 @@ has during_init => (
     isa         => 'Bool',
 );
 
+has _t => (
+    is          => 'rw',
+);
+
 override run => sub {
     my $self = shift;
 
@@ -60,15 +64,19 @@ override run => sub {
 
     # We need to wait until Bot::Backbone has had a chance to instantiate the
     # service before we can work with it.
-    $joined->recv;
-    $self->ready->cb(sub {
+    $joined->cb(sub {
+        $self->_t(
+            AnyEvent->timer(after => 1, cb => sub {
+                $self->ready->recv;
 
-        #warn "# SENDING\n";
-        $self->get_service('test_group')->send_message({
-            text => "!hello " . $self->say_code,
-        });
+                #warn "# SENDING\n";
+                $self->get_service('test_group')->send_message({
+                    text => "!hello " . $self->say_code,
+                });
 
-        $self->shutdown;
+                $self->shutdown;
+            })
+        );
     });
 };
 
