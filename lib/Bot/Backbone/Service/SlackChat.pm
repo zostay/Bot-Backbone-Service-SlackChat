@@ -267,16 +267,22 @@ This connects to Slack and prepares the bot for communication.
 sub _when_channel_joined {
     my ($self, $init) = @_;
 
-    next unless $self->has_channel_joined_callback;
+    return unless $self->has_channel_joined_callback;
 
     my @mine;
 
-    my $channels = $self->api->channels->list;
+    my $channels = $self->_cached('api.channels.list', sub {
+        $self->api->channels->list
+    });
+
     if ($channels->{ok}) {
         push @mine, grep { $_->{is_member} && !$_->{is_archived} } @{ $channels->{channels} };
     }
 
-    my $groups   = $self->api->groups->list;
+    my $groups = $self->_cached('api.groups.list', sub {
+        $self->api->groups->list
+    });
+
     if ($groups->{ok}) {
         push @mine, grep { !$_->{is_archived} } @{ $groups->{groups} };
     }
@@ -407,19 +413,15 @@ sub load_channel {
     my $group;
     my $type = substr $value, 0, 1;
     if ($type eq 'G') {
-        # TODO When this method is added, bring it back..
-        # See https://github.com/mihyaeru21/p5-WebService-Slack-WebApi/issues/4
-        #my $res = $self->api->groups->info( channel => $value );
-        #$group = $res->{group} if $res->{ok};
-        my $res = $self->_cached("api.groups.list", sub { $self->api->groups->list });
-        if ($res->{ok}) {
-            ($group) = grep { $_->{ $by } eq $value } @{ $res->{groups} };
-        }
+        my $res = $self->_cached("api.groups.info:group=$value", sub {
+            $self->api->groups->info( channel => $value )
+        });
+        $group = $res->{group} if $res->{ok};
     }
     elsif ($type eq 'C') {
         my $res = $self->_cached("api.channels.info:channel=$value", sub {
-                $self->api->channels->info( channel => $value )
-            });
+            $self->api->channels->info( channel => $value )
+        });
         $group = $res->{channel} if $res->{ok};
     }
     else {
@@ -439,6 +441,8 @@ sub load_channel {
     method join_group({ group => $group })
 
 Given the ID of a channel or group, this causes the bot to open or join it. Note that Slack bot integration accounts might not be able to join team channels, but may still be invited.
+
+B<CAVEAT:> Slack does not permit bots to join groups, so this method call will be a no-op for bot users. This will only work if this code is operating a regular user account.
 
 =cut
 
