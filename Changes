@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.161950  2016-07-13 13:41:49-05:00 America/Chicago
+
     * Added the on_channel_joined helper to make it easy to react when a bot is
       invited to channels.
     * Fixed an internal work around that depended on
