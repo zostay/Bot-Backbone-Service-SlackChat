@@ -15,6 +15,7 @@ use Carp;
 use CHI;
 use Encode;
 use AnyEvent::SlackRTM;
+use Try::Tiny;
 use WebService::Slack::WebApi;
 
 # ABSTRACT: Connect and chat with a Slack server
@@ -73,6 +74,19 @@ L<Bot Token|https://slack.com/services/new/bot>. If you configure a bot integrat
 Which you use will depend on whether you want the bot to control a user account or a bot integration account. You are responsible for adhering to the Slack terms of use in whatever you do.
 
 =cut
+
+sub _safe_api(&) {
+    my $code = shift;
+    try {
+        $code->();
+    }
+    catch {
+        {
+            ok    => 0,
+            error => "$_",
+        }
+    };
+}
 
 has token => (
     is          => 'ro',
@@ -228,7 +242,9 @@ has whoami => (
 
 sub _build_whoami {
     my $self = shift;
-    my $res = $self->api->auth->test;
+    my $res = _safe_api {
+        $self->api->auth->test;
+    };
 
     if ($res->{ok}) {
         $res;
@@ -288,7 +304,9 @@ sub _check_channels_joined {
     my @mine;
 
     my $channels = $self->_cached('api.channels.list', sub {
-        $self->api->channels->list
+        _safe_api {
+            $self->api->channels->list
+        };
     });
 
     if ($channels->{ok}) {
@@ -296,7 +314,9 @@ sub _check_channels_joined {
     }
 
     my $groups = $self->_cached('api.groups.list', sub {
-        $self->api->groups->list
+        _safe_api {
+            $self->api->groups->list
+        };
     });
 
     if ($groups->{ok}) {
@@ -358,12 +378,18 @@ sub load_user {
     my $user;
     if ($by eq 'id') {
         my $res = $self->_cached("api.users.info:user=$value", sub {
+            _safe_api {
                 $self->api->users->info(user => $value);
-            });
+            };
+        });
         $user = $res->{user} if $res->{ok};
     }
     elsif ($by eq 'name') {
-        my $list = $self->_cached("api.users.list", sub { $self->api->users->list });
+        my $list = $self->_cached("api.users.list", sub {
+            _safe_api {
+                $self->api->users->list;
+            };
+        });
         if ($list->{ok}) {
             ($user) = grep { $_->{name} eq $value } @{ $list->{members} };
         }
@@ -410,7 +436,11 @@ sub load_user_channel {
 
     croak "unknown lookup type $by" unless $by eq 'user' or $by eq 'id';
 
-    my $list = $self->_cached("api.im.list", sub { $self->api->im->list });
+    my $list = $self->_cached("api.im.list", sub {
+        _safe_api {
+            $self->api->im->list
+        };
+    });
 
     croak "unknown IM $by $value" unless $list->{ok};
 
@@ -430,13 +460,17 @@ sub load_channel {
     my $type = substr $value, 0, 1;
     if ($type eq 'G') {
         my $res = $self->_cached("api.groups.info:group=$value", sub {
-            $self->api->groups->info( channel => $value )
+            _safe_api {
+                $self->api->groups->info( channel => $value );
+            };
         });
         $group = $res->{group} if $res->{ok};
     }
     elsif ($type eq 'C') {
         my $res = $self->_cached("api.channels.info:channel=$value", sub {
-            $self->api->channels->info( channel => $value )
+            _safe_api {
+                $self->api->channels->info( channel => $value );
+            };
         });
         $group = $res->{channel} if $res->{ok};
     }
@@ -468,10 +502,14 @@ sub join_group {
     my $type = substr $options->{group}, 0, 1;
 
     if ($type eq 'G') {
-        $self->api->groups->open(channel => $options->{group});
+        _safe_api {
+            $self->api->groups->open(channel => $options->{group});
+        };
     }
     elsif ($type eq 'C') {
-        $self->api->channels->join(name => $options->{group});
+        _safe_api {
+            $self->api->channels->join(name => $options->{group});
+        };
     }
     else {
         croak "unknown group type $type";
@@ -568,13 +606,19 @@ sub mark_read {
 
     my $type = substr $channel, 0, 1;
     if ($type eq 'C') {
-        $self->api->channels->mark( channel => $channel, ts => $ts );
+        _safe_api {
+            $self->api->channels->mark( channel => $channel, ts => $ts );
+        };
     }
     elsif ($type eq 'G') {
-        $self->api->groups->mark( channel => $channel, ts => $ts );
+        _safe_api {
+            $self->api->groups->mark( channel => $channel, ts => $ts );
+        };
     }
     elsif ($type eq 'D') {
-        $self->api->im->mark( channel => $channel, ts => $ts );
+        _safe_api {
+            $self->api->im->mark( channel => $channel, ts => $ts );
+        };
     }
 
     $self->last_mark(time);
@@ -654,7 +698,9 @@ sub send_message {
         $message_opts{attachments} = $attachments;
     }
 
-    $self->api->chat->post_message(%message_opts);
+    _safe_api {
+        $self->api->chat->post_message(%message_opts);
+    };
 }
 
 =begin Pod::Coverage
